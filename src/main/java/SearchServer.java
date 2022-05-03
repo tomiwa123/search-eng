@@ -27,8 +27,8 @@ public class SearchServer {
     public static void main(String[] args) {
         port(3000);
 
-        System.setProperty("aws.accessKeyId", "AKIARQAR3TUYC775KZQ5");
-        System.setProperty("aws.secretKey", "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");
+        System.setProperty("aws.accessKeyId", "ACCESS_KEY");
+        System.setProperty("aws.secretKey", "SECRET_KEY");
 
         get("/", (req, res) -> {
             return "<html>" +
@@ -52,33 +52,28 @@ public class SearchServer {
                     "</body></html>";
         });
 
-//        post("search", (req, res) -> {
-//            String output = "";
-//            Table termFrequencyTable = docClient.getTable("test-tf-index");
-//            Index termFrequencyIndex = termFrequencyTable.getIndex("word-tf-index");
-//            QuerySpec spec = new QuerySpec()
-//                    .withHashKey("word", "them");
-//            ItemCollection<QueryOutcome> items = termFrequencyIndex.query(spec);
-//            Iterator<Item> iterator = items.iterator();
-//            System.out.println("got iterator");
-//
-//            while (iterator.hasNext()) {
-//                System.out.println(" iterator has next");
-//                Item next = iterator.next();
-//                output += next.get("word").toString() + " " + next.get("tf").toString();
-//            }
-//            return output;
-//        });
-
         post("search", (req, res) -> {
 
             String searchQuery = req.queryParams("search");
-            List<String> searchQueryTerms = Arrays.asList(searchQuery.split(" "));
+//            List<String> searchQueryTerms = Arrays.asList(searchQuery.split(" "));
+
+            List<String> searchQueryParseTerms = Arrays.asList(searchQuery.split(" "));
+            if (searchQueryParseTerms == null) return printQueryResults(req.queryParams("search"), null);
+
+            // Convert the search terms to lower case
+            List<String> searchQueryTerms = new ArrayList<>();
+            searchQueryParseTerms.forEach((String s) -> searchQueryTerms.add(s.toLowerCase(Locale.ROOT)));
+
+            for (String search: searchQueryTerms) {
+                System.out.println("Search: "+ search);
+            }
+
 
             // Retrieve and Merge the Doc list for each query term
             List<QueryResult> queryResultCandidates = new LinkedList<>();
             for (String queryTerm: searchQueryTerms) {
                 queryResultCandidates = mergeDocumentLists(queryResultCandidates, getDocumentList(queryTerm));
+                if (queryResultCandidates == null) return printQueryResults(req.queryParams("search"), null);
             }
 
             // Retrieve the url link for each document
@@ -100,13 +95,29 @@ public class SearchServer {
 
             // Rank by score: tf-idf * pagerank
             queryResults.sort((qr_a, qr_b) -> {
-                if (qr_a.pagerank * qr_a.tf / qr_a.idf < qr_b.pagerank * qr_b.tf / qr_b.idf) {return 1;}
-                else if (qr_b.pagerank * qr_b.tf / qr_b.idf < qr_a.pagerank * qr_a.tf / qr_a.idf) {return -1;}
+                if (qr_a.pagerank * qr_a.tf * qr_a.idf < qr_b.pagerank * qr_b.tf * qr_b.idf) {return 1;}
+                else if (qr_b.pagerank * qr_b.tf * qr_b.idf < qr_a.pagerank * qr_a.tf * qr_a.idf) {return -1;}
                 else return 0;
             });
 
+            // Filter for repeated domains and limit 20 results
+            List<QueryResult> finalResults = new LinkedList<>();
+            int resultNo = 0;
+            Set<String> domains = new HashSet<>();
+
+            for (QueryResult queryResult: queryResults) {
+                if (inDomains(domains, new URLInfo(queryResult.url))) {
+                    continue;
+                }
+                finalResults.add(queryResult);
+                resultNo++;
+                if (resultNo >= 20) {
+                    break;
+                }
+            }
+
             // Return Query results
-            return printQueryResults(req.queryParams("search"), queryResults);
+            return printQueryResults(req.queryParams("search"), finalResults);
         });
     }
 
@@ -122,7 +133,7 @@ public class SearchServer {
                 queryResult.idf = NUMBER_OF_DOCUMENTS / size;
                 output.add(queryResult);
             }
-
+            if (output.isEmpty()) return null;
             return output;
         }
 
@@ -136,26 +147,24 @@ public class SearchServer {
                 }
             }
         }
+        if (output.isEmpty()) return null;
         return output;
     }
 
     private static List<Item> getDocumentList(String queryTerm) {
-//        Table termFrequencyTable = docClient.getTable("termFrequency");
-        Table termFrequencyTable = docClient.getTable("test-tf");
+        Table termFrequencyTable = docClient.getTable("termFrequency");
+//        Table termFrequencyTable = docClient.getTable("test-tf");
         Index termFrequencyIndex = termFrequencyTable.getIndex("word-tf-index");
-//        RangeKeyCondition rangeKeyCondition = new RangeKeyCondition("tf").gt(new BigDecimal(1));
+        RangeKeyCondition rangeKeyCondition = new RangeKeyCondition("tf").gt(new BigDecimal(5));
         QuerySpec spec = new QuerySpec()
                 .withHashKey("word", queryTerm)
-                .withKeyConditionExpression("tf > :tf_limit")
-                .withValueMap(new ValueMap().withNumber(":tf_limit",  2));
-//                .withKeyConditionExpression("tf > :end_date")
-//                .withValueMap(new ValueMap().withNumber(":end_date", 2));
-//                .withRangeKeyCondition(rangeKeyCondition);
-//                .withScanIndexForward(true);
+                .withRangeKeyCondition(rangeKeyCondition)
+                .withScanIndexForward(false);
+
         ItemCollection<QueryOutcome> items = termFrequencyIndex.query(spec);
         Iterator<Item> iterator = items.iterator();
 
-        List<Item> output = new ArrayList<Item>();
+        List<Item> output = new ArrayList<>();
         while (iterator.hasNext()) {
             output.add(iterator.next());
         }
@@ -180,7 +189,7 @@ public class SearchServer {
             return;
         }
         double pageRank = Float.valueOf(item.get("pagerank").toString());
-        queryResult.pagerank = 1 + Math.log(Math.min(pageRank, 1000));
+        queryResult.pagerank = Math.log(Math.min(1 + pageRank, 10000));
 //        System.out.println(queryResult.docID + " " + pageRank + " " + queryResult.pagerank);
     }
 
@@ -204,24 +213,30 @@ public class SearchServer {
                 "</div><br /><br />";
         output += "<div class=\"container-md\"><h4> Query: " + query + "</h4>";
         output += "<ol>";
-        for (QueryResult queryResult: queryResults) {
-            output += "\n<li><p>" + "<a href=\"" + queryResult.url + "\" target=\"_blank\">" + queryResult.url + "</a> " +
-                    "TF: " + queryResult.tf + " " + "IDF: " + queryResult.idf + " " +
-                    "PageRank: " + queryResult.pagerank + "</p></li>";
+        if (!queryResults.isEmpty()) {
+            for (QueryResult queryResult: queryResults) {
+                output += "\n<li><p>" + "<a href=\"" + queryResult.url + "\" target=\"_blank\">" + queryResult.url + "</a> " +
+                        "TF: " + queryResult.tf + " " + "IDF: " + queryResult.idf + " " +
+                        "PageRank: " + queryResult.pagerank + "</p></li>";
+            }
         }
         output += "</ol>";
         output += "</div>" +
                 "<script src=\"https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js\" integrity=\"sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p\" crossorigin=\"anonymous\"></script>" +
                 "</body></html>";
 
-//        String output = "<html><body>";
-//        output += "<div>" + query + "</div>";
-//        for (QueryResult queryResult: queryResults) {
-//            output += "\n<div>" + "<a href=\"" + queryResult.url + "\">" + queryResult.url + "</a> " +
-//                    "TF: " + queryResult.tf + " " + "IDF: " + queryResult.idf + " " +
-//                    "PageRank: " + queryResult.pagerank + "</div>";
-//        }
-//        output += "</body></html>";
         return output;
+    }
+
+    private static boolean inDomains(Set<String> domains, URLInfo urlInfo) {
+        for (String host: urlInfo.getHostName().split("\\.")) {
+            for (String domain: domains) {
+                if (domain.contains(host)) {
+                    return true;
+                }
+            }
+        }
+        domains.add(urlInfo.getHostName());
+        return false;
     }
 }
