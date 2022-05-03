@@ -64,10 +64,6 @@ public class SearchServer {
             List<String> searchQueryTerms = new ArrayList<>();
             searchQueryParseTerms.forEach((String s) -> searchQueryTerms.add(s.toLowerCase(Locale.ROOT)));
 
-            for (String search: searchQueryTerms) {
-                System.out.println("Search: "+ search);
-            }
-
 
             // Retrieve and Merge the Doc list for each query term
             List<QueryResult> queryResultCandidates = new LinkedList<>();
