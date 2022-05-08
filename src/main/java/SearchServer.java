@@ -1,15 +1,9 @@
 import static spark.Spark.*;
 
 import com.amazonaws.services.dynamodbv2.document.*;
-import com.amazonaws.services.dynamodbv2.document.spec.GetItemSpec;
 import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
-import com.amazonaws.services.dynamodbv2.document.utils.ValueMap;
-import com.amazonaws.services.dynamodbv2.model.*;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
-
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -27,8 +21,8 @@ public class SearchServer {
     public static void main(String[] args) {
         port(3000);
 
-        System.setProperty("aws.accessKeyId", "ACCESS_KEY");
-        System.setProperty("aws.secretKey", "SECRET_KEY");
+        System.setProperty("aws.accessKeyId", "AWS_ACCESS_KEY");
+        System.setProperty("aws.secretKey", "AWS_SECRET_KEY");
 
         get("/", (req, res) -> {
             return "<html>" +
@@ -55,7 +49,6 @@ public class SearchServer {
         post("search", (req, res) -> {
 
             String searchQuery = req.queryParams("search");
-//            List<String> searchQueryTerms = Arrays.asList(searchQuery.split(" "));
 
             List<String> searchQueryParseTerms = Arrays.asList(searchQuery.split(" "));
             if (searchQueryParseTerms == null) return printQueryResults(req.queryParams("search"), null);
@@ -63,7 +56,6 @@ public class SearchServer {
             // Convert the search terms to lower case
             List<String> searchQueryTerms = new ArrayList<>();
             searchQueryParseTerms.forEach((String s) -> searchQueryTerms.add(s.toLowerCase(Locale.ROOT)));
-
 
             // Retrieve and Merge the Doc list for each query term
             List<QueryResult> queryResultCandidates = new LinkedList<>();
@@ -78,7 +70,7 @@ public class SearchServer {
                 // Add the document link
                 QueryResult newQueryResult = getDocumentLink(queryResult);
                 if (newQueryResult == null) {
-//                    System.err.println("Did not find docID " + queryResult.docID + " in database");
+                    System.err.println("Did not find docID " + queryResult.docID + " in database");
                 } else {
                     queryResults.add(newQueryResult);
                 }
@@ -89,7 +81,7 @@ public class SearchServer {
                 getPageRankScore(queryResult);
             }
 
-            // Rank by score: tf-idf * pagerank
+            // Rank by score: tf * idf * pagerank
             queryResults.sort((qr_a, qr_b) -> {
                 if (qr_a.pagerank * qr_a.tf * qr_a.idf < qr_b.pagerank * qr_b.tf * qr_b.idf) {return 1;}
                 else if (qr_b.pagerank * qr_b.tf * qr_b.idf < qr_a.pagerank * qr_a.tf * qr_a.idf) {return -1;}
