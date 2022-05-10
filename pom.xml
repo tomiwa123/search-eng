@@ -7,29 +7,15 @@
     <groupId>org.example</groupId>
     <artifactId>search-eng</artifactId>
     <version>1.0-SNAPSHOT</version>
-    <dependencyManagement>
-        <dependencies>
+<!--    <dependencyManagement>-->
+<!--        <dependencies>-->
 <!--            <dependency>-->
-<!--                <groupId>software.amazon.awssdk</groupId>-->
-<!--                <artifactId>bom</artifactId>-->
-<!--                <version>2.15.0</version>-->
-<!--                <type>pom</type>-->
-<!--                <scope>import</scope>-->
+<!--                <groupId>com.amazonaws</groupId>-->
+<!--                <artifactId>aws-java-sdk</artifactId>-->
+<!--                <version>1.11.1000</version>-->
 <!--            </dependency>-->
-            <dependency>
-                <groupId>com.amazonaws</groupId>
-                <artifactId>aws-java-sdk</artifactId>
-                <version>1.11.1000</version>
-            </dependency>
-<!--            <dependency>-->
-<!--                <groupId>com.amazon.aws</groupId>-->
-<!--                <artifactId>java-sdk-bom</artifactId>-->
-<!--                <version>1.11.327</version>-->
-<!--                <type>pom</type>-->
-<!--                <scope>import</scope>-->
-<!--            </dependency>-->
-        </dependencies>
-    </dependencyManagement>
+<!--        </dependencies>-->
+<!--    </dependencyManagement>-->
     <dependencies>
         <dependency>
             <groupId>com.sparkjava</groupId>
@@ -41,6 +27,29 @@
             <artifactId>aws-java-sdk</artifactId>
             <version>1.12.207</version>
         </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.apache.logging.log4j</groupId>-->
+<!--            <artifactId>log4j-slf4j-impl</artifactId>-->
+<!--            <version>2.17.1</version>-->
+<!--        </dependency>-->
+
+<!--        <dependency>-->
+<!--            <groupId>org.apache.logging.log4j</groupId>-->
+<!--            <artifactId>log4j-core</artifactId>-->
+<!--            <version>2.17.1</version>-->
+<!--        </dependency>-->
+<!--        <dependency>-->
+<!--            <groupId>org.apache.logging.log4j</groupId>-->
+<!--            <artifactId>log4j-api</artifactId>-->
+<!--            <version>2.17.1</version>-->
+<!--        </dependency>-->
+<!--        <dependency>-->
+<!--            <groupId>org.apache.logging.log4j</groupId>-->
+<!--            <artifactId>log4j-slf4j-impl</artifactId>-->
+<!--            <version>2.17.1</version>-->
+<!--        </dependency>-->
+
+
 <!--        <dependency>-->
 <!--            <groupId>software.amazon.awssdk</groupId>-->
 <!--            <artifactId>dynamodb</artifactId>-->
@@ -65,8 +74,128 @@
     </dependencies>
 
     <properties>
-        <maven.compiler.source>15</maven.compiler.source>
-        <maven.compiler.target>15</maven.compiler.target>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
     </properties>
-
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.2.4</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>2.4</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <addClasspath>true</addClasspath>
+                            <classpathPrefix>lib/</classpathPrefix>
+                            <mainClass>MasterServer</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>1.6.0</version>
+                <executions>
+                    <execution>
+                        <id>master</id>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>MasterServer</mainClass>
+                            <arguments>
+                                <argument>3000</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+<!--                    <execution>-->
+<!--                        <id>worker1</id>-->
+<!--                        <goals>-->
+<!--                            <goal>java</goal>-->
+<!--                        </goals>-->
+<!--                        <configuration>-->
+<!--                            <mainClass>WorkerServer</mainClass>-->
+<!--                            <arguments>-->
+<!--                                <argument>3030</argument>-->
+<!--                            </arguments>-->
+<!--                        </configuration>-->
+<!--                    </execution>-->
+<!--                    &lt;!&ndash; TODO: run worker2 &ndash;&gt;-->
+<!--                    <execution>-->
+<!--                        <id>worker2</id>-->
+<!--                        <goals>-->
+<!--                            <goal>java</goal>-->
+<!--                        </goals>-->
+<!--                        <configuration>-->
+<!--                            <mainClass>WorkerServer</mainClass>-->
+<!--                            <arguments>-->
+<!--                                <argument>3031</argument>-->
+<!--                            </arguments>-->
+<!--                        </configuration>-->
+<!--                    </execution>-->
+                </executions>
+            </plugin>
+        </plugins>
+<!--        <plugins>-->
+<!--            <plugin>-->
+<!--                <groupId>org.apache.maven.plugins</groupId>-->
+<!--                <artifactId>maven-shade-plugin</artifactId>-->
+<!--                <version>3.2.4</version>-->
+<!--                <executions>-->
+<!--                    <execution>-->
+<!--                        <phase>package</phase>-->
+<!--                        <goals>-->
+<!--                            <goal>shade</goal>-->
+<!--                        </goals>-->
+<!--                    </execution>-->
+<!--                </executions>-->
+<!--            </plugin>-->
+<!--            <plugin>-->
+<!--                &lt;!&ndash; Build an executable JAR &ndash;&gt;-->
+<!--                <groupId>org.apache.maven.plugins</groupId>-->
+<!--                <artifactId>maven-jar-plugin</artifactId>-->
+<!--                <version>3.2.0</version>-->
+<!--                <configuration>-->
+<!--                    <archive>-->
+<!--                        <manifest>-->
+<!--                            <addClasspath>true</addClasspath>-->
+<!--                            <mainClass>MasterServer</mainClass>-->
+<!--                            <arguments>-->
+<!--                                <argument>3000</argument>-->
+<!--                            </arguments>-->
+<!--                        </manifest>-->
+<!--&lt;!&ndash;                        <manifest>&ndash;&gt;-->
+<!--&lt;!&ndash;                            <addClasspath>true</addClasspath>&ndash;&gt;-->
+<!--&lt;!&ndash;                            <mainClass>WorkerServer</mainClass>&ndash;&gt;-->
+<!--&lt;!&ndash;                            <arguments>&ndash;&gt;-->
+<!--&lt;!&ndash;                                <argument>3030</argument>&ndash;&gt;-->
+<!--&lt;!&ndash;                            </arguments>&ndash;&gt;-->
+<!--&lt;!&ndash;                        </manifest>&ndash;&gt;-->
+<!--&lt;!&ndash;                        <manifest>&ndash;&gt;-->
+<!--&lt;!&ndash;                            <addClasspath>true</addClasspath>&ndash;&gt;-->
+<!--&lt;!&ndash;                            <mainClass>WorkerServer</mainClass>&ndash;&gt;-->
+<!--&lt;!&ndash;                            <arguments>&ndash;&gt;-->
+<!--&lt;!&ndash;                                <argument>3031</argument>&ndash;&gt;-->
+<!--&lt;!&ndash;                            </arguments>&ndash;&gt;-->
+<!--&lt;!&ndash;                        </manifest>&ndash;&gt;-->
+<!--                    </archive>-->
+<!--                </configuration>-->
+<!--            </plugin>-->
+<!--        </plugins>-->
+    </build>
 </project>

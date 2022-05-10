@@ -1,73 +1,51 @@
-import static spark.Spark.*;
-
-import com.amazonaws.services.dynamodbv2.document.*;
-import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
+import com.amazonaws.services.dynamodbv2.document.*;
+import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
+import spark.Request;
+import spark.Response;
+import spark.Route;
 
+import java.io.*;
 import java.math.BigDecimal;
 import java.util.*;
 
-public class SearchServer {
+import static spark.Spark.*;
+
+public class SearchServices {
 
     private static AmazonDynamoDB client = AmazonDynamoDBClientBuilder.standard().build();
     private static DynamoDB docClient = new DynamoDB(client);
     private static int NUMBER_OF_DOCUMENTS = 1000000;
 
-    public SearchServer() {
-
-    }
-
-    public static void main(String[] args) {
-
-        if (args.length < 1) {
-            System.out.println("Usage: MasterServer [port number]");
-            System.exit(1);
-        }
-
-//        port(3000);
-        int myPort = Integer.valueOf(args[0]);
-        port(myPort);
-        String masterURL = null;
-
-        if (args.length == 2) {
-            masterURL = args[1];
-        }
-
-
-
-        System.setProperty("aws.accessKeyId", System.getenv("AWS_ACCESS_KEY"));
-        System.setProperty("aws.secretKey", System.getenv("AWS_SECRET_KEY"));
-        ;
-
-        get("/", (req, res) -> {
-            return "<html>" +
-                    "<head>" +
-                    "<link href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css\" rel=\"stylesheet\" integrity=\"sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3\" crossorigin=\"anonymous\">" +
-                    "<style>\n" +
-                    "  h1 {color:red;}\n" +
-                    "  p {color:blue;}\n" +
-                    "</style></head>\n" +
-
-                    "<body>" +
-                    "<div class=\"container\">" +
-                    "<h2>GooseGooseStop</h2>" +
-                    "<form method=\"POST\" action=\"search\">" +
-                    "<label for=\"search\">Search Engine:</label><br>" +
-                    "<input type=\"text\" id=\"search\" name=\"search\"><br>" +
-                    "<input type=\"submit\" value=\"Submit\">" +
-                    "</form>" +
-                    "</div>" +
-                    "<script src=\"https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js\" integrity=\"sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p\" crossorigin=\"anonymous\"></script>" +
-                    "</body></html>";
+    public static void getSearchResults() {
+        post("search", (req, res) -> {
+            String searchQuery = req.queryParams("search");
+            long timeNow = new Date().getTime();
+//            Thread.sleep(30);
+            return printQueryResults(req.queryParams("search"), null, timeNow);
         });
 
-        post("search", (req, res) -> {
-
+        get("search", (req, res) -> {
             String searchQuery = req.queryParams("search");
+            long timeNow = new Date().getTime();
+            Thread.sleep(30);
+            return printQueryResults(req.queryParams("search"), null, timeNow);
+        });
 
-            List<String> searchQueryParseTerms = Arrays.asList(searchQuery.split(" "));
-            if (searchQueryParseTerms == null) return printQueryResults(req.queryParams("search"), null);
+        post("searche", new SearchHandler());
+        get("search", new SearchHandler());
+    }
+
+    private static class SearchHandler implements Route {
+
+        @Override
+        public Object handle(Request req, Response res) throws Exception {
+            String searchQuery = req.queryParams("search");
+            long timeNow = new Date().getTime();
+
+            List<String> searchQueryParseTerms = Arrays.asList(searchQuery.split("%20"));
+            if (searchQueryParseTerms == null) return printQueryResults(req.queryParams("search"), null, timeNow);
 
             // Convert the search terms to lower case
             List<String> searchQueryTerms = new ArrayList<>();
@@ -77,7 +55,9 @@ public class SearchServer {
             List<QueryResult> queryResultCandidates = new LinkedList<>();
             for (String queryTerm: searchQueryTerms) {
                 queryResultCandidates = mergeDocumentLists(queryResultCandidates, getDocumentList(queryTerm));
-                if (queryResultCandidates == null) return printQueryResults(req.queryParams("search"), null);
+                if (queryResultCandidates == null) {
+                    return printQueryResults(req.queryParams("search"), null, timeNow);
+                };
             }
 
             // Retrieve the url link for each document
@@ -121,8 +101,8 @@ public class SearchServer {
             }
 
             // Return Query results
-            return printQueryResults(req.queryParams("search"), finalResults);
-        });
+            return printQueryResults(req.queryParams("search"), finalResults, timeNow);
+        }
     }
 
     private static List<QueryResult> mergeDocumentLists(List<QueryResult> list_a, List<Item> list_b) {
@@ -197,7 +177,7 @@ public class SearchServer {
 //        System.out.println(queryResult.docID + " " + pageRank + " " + queryResult.pagerank);
     }
 
-    private static String printQueryResults(String query, List<QueryResult> queryResults) {
+    private static String printQueryResults(String query, List<QueryResult> queryResults, long timeNow) {
         String output = "<html>" +
                 "<head>" +
                 "<link href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css\" rel=\"stylesheet\" integrity=\"sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3\" crossorigin=\"anonymous\">" +
@@ -209,15 +189,17 @@ public class SearchServer {
                 "<body>" +
                 "<div class=\"container\">" +
                 "<h2>GooseGooseStop</h2>" +
-                "<form method=\"POST\" action=\"search\">" +
+                "<form method=\"POST\" action=\"submit\">" +
                 "<label for=\"search\">Search Engine:</label><br>" +
                 "<input type=\"text\" id=\"search\" name=\"search\"><br>" +
                 "<input type=\"submit\" value=\"Submit\">" +
                 "</form>" +
                 "</div><br /><br />";
-        output += "<div class=\"container-md\"><h4> Query: " + query + "</h4>";
+        output += "<div class=\"container-md\"><h4> Query: " + query + " (Time: " +
+                ((new Date().getTime()) - timeNow) +
+                " milliseconds) " + "</h4>";
         output += "<ol>";
-        if (!queryResults.isEmpty()) {
+        if (queryResults!= null && !queryResults.isEmpty()) {
             for (QueryResult queryResult: queryResults) {
                 output += "\n<li><p>" + "<a href=\"" + queryResult.url + "\" target=\"_blank\">" + queryResult.url + "</a> " +
                         "TF: " + queryResult.tf + " " + "IDF: " + queryResult.idf + " " +
@@ -229,6 +211,18 @@ public class SearchServer {
                 "<script src=\"https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js\" integrity=\"sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p\" crossorigin=\"anonymous\"></script>" +
                 "</body></html>";
 
+        String filename = "./searchEval.txt";
+        File file = new File(filename);
+        try {
+            file.createNewFile();
+            FileWriter writer = null;
+            writer = new FileWriter(file, true);
+            writer.write("(" + query + ", " + ((new Date().getTime()) - timeNow) + ")");
+            writer.write("\r\n");
+            writer.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         return output;
     }
 
